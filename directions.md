@@ -1,0 +1,11 @@
+this is started project your job is to do the taks i give you
+1, Analyze the db model (you should use the db structure and you can add anything you think is necessary but never change/delete anything in it) and file structure to help you build correctly
+2, Fill all api routes with 4 CRUD operations support 
+3, Fill all ui routes with appropriate content take inspiration from the project located in "/home/xdk/Projects/storemgmt" (also create the theme manager inspired by the referenced project, remember to be creative with it instead of just copying the theme), you must use gsap and framer-motion and keep every thing extremely animated
+4, this is the flow for the ui
+    - "/home" shows total number of machines, products, last refill time for the selected machine, machine selection,  summary graph on transactions and the in between refills respecting the time they are created (to give you some context this app is for a vending machine so that's why transactions are mixed up with refills to locate when the machine gone empy on an item)
+    - "/order" is to order a product so let the user add products and edit numbers on each then add it through the api (but it should check if the products and amounts of the products is available calculating the remaining products and amounts(ml) using the difference between the last refill and the sum of the products in transactions just before the last refill entry, here there are many breaking points so feel free to make changes that make it work). if you are confused how will the order know the machine to be ordered from, it should accept machineId route param because this route will generally accessed with qr code scan (so add the scan feature to order) so the link will contain that but if it doesn't just add a field for entering the machineId
+    - "/settings" is all for theme 
+    - "/transactions" is list of transactions and refills in chronological order (they are mixed up so that they all appear just with time sort) and a selection for machine to filter transactions per machine
+    - use zustand to optimize fetches (just fetch once per a session) and dont forget to fetch admins and if user?.id (from clerk) is not in the admins list, routes should just be "/home" for transactions summary just for the user, "/order" to order, and settings
+    - make sure to summarize all you did finally
