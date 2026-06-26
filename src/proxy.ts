@@ -1,6 +1,6 @@
 import { createRouteMatcher, clerkMiddleware } from "@clerk/nextjs/server";
 
-const isPublicRoute = createRouteMatcher(["/order", "/settings"]);
+const isPublicRoute = createRouteMatcher(["/order", "/settings", "/api/order"]);
 const isApiRoute = createRouteMatcher(["/api(.*)"]);
 
 export default clerkMiddleware(async (auth, req) => {
