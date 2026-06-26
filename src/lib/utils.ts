@@ -1,7 +1,7 @@
 import type { MachineType, ProductType } from "./types";
 
 /** Clerk user IDs with admin access. Add your Clerk IDs here. */
-export const ADMINS: string[] = ["user_3Fdp2UzlldWYj2FnkM1saWKapMM"];
+export const ADMINS: string[] = ["user_3Fdp2UzlldWYj2FnkM1saWKapMM", "user_3Ffhxg6jqhx4DtSy6ivFKkeqOWJ"];
 
 export function isAdmin(userId?: string | null): boolean {
   if (!userId || userId === "anon") return false;
