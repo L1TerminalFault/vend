@@ -19,8 +19,8 @@ export type MachineInventory = {
 };
 
 type StoreState = {
-  effectiveUser: EffectiveUser | null;
-  setEffectiveUser: (user: EffectiveUser | null) => void;
+  effectiveUser: EffectiveUser;
+  setEffectiveUser: (user: EffectiveUser) => void;
   machines: MachineType[];
   setMachines: (machines: MachineType[]) => void;
   products: ProductType[];
@@ -34,7 +34,7 @@ type StoreState = {
 };
 
 export const useStoreStore = create<StoreState>((set) => ({
-  effectiveUser: null,
+  effectiveUser: { userId: "anon", role: "User" },
   setEffectiveUser: (user) => set({ effectiveUser: user }),
   machines: [],
   setMachines: (machines) => set({ machines }),

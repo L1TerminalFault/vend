@@ -12,7 +12,7 @@ import {
 import { motion } from "framer-motion";
 import { FiBox, FiDroplet, FiPlus, FiX, FiArrowLeft, FiAlertTriangle, FiMapPin, FiExternalLink } from "react-icons/fi";
 import { CgSpinner } from "react-icons/cg";
-import { isAdmin, parseApiArray, getGoogleMapsUrl } from "@/lib/utils";
+import { isAdmin, parseApiArray, getGoogleMapsUrl, parseCoords } from "@/lib/utils";
 import ProductIcon, { getProductIconBg } from "@/components/ProductIcon";
 import type { MachineType, ProductType } from "@/lib/types";
 
@@ -168,6 +168,11 @@ export default function MachineDetailPage() {
 	const waterRemaining = getRemainingWater(machine._id, machines, transactions, refills, products);
 	const waterPct = inventory.waterCapacity > 0 ? (waterRemaining / inventory.waterCapacity) * 100 : 0;
 	const mapsUrl = getGoogleMapsUrl(machine.locationDetail);
+	const editCoords = parseCoords(editLocationDetail);
+	const editMapsUrl = editCoords ? `https://www.google.com/maps?q=${editCoords.lat},${editCoords.lng}` : null;
+	const editMapEmbedUrl = editCoords
+		? `https://maps.google.com/maps?q=${editCoords.lat},${editCoords.lng}&z=16&output=embed`
+		: null;
 
 	return (
 		<div className="w-full h-full flex flex-col gap-6 p-6 px-4 md:px-8 overflow-y-auto mb-[100px] scrollbar-hidden max-w-3xl mx-auto">
@@ -237,6 +242,37 @@ export default function MachineDetailPage() {
 						placeholder="e.g. 40.7128, -74.0060"
 						className="p-3 rounded-xl bg-theme-background outline-none text-theme-text border border-theme-border/30 focus:border-theme-accent font-mono text-sm"
 					/>
+					<div className="overflow-hidden rounded-2xl border border-theme-border/30 bg-theme-background/50">
+						{editMapEmbedUrl ? (
+							<>
+								<iframe
+									title="Machine coordinates map preview"
+									src={editMapEmbedUrl}
+									className="h-40 w-full border-0"
+									loading="lazy"
+									referrerPolicy="no-referrer-when-downgrade"
+								/>
+								<div className="flex items-center justify-between gap-3 p-3 text-xs text-theme-text/50">
+									<span className="font-mono">
+										{editCoords?.lat.toFixed(5)}, {editCoords?.lng.toFixed(5)}
+									</span>
+									<a
+										href={editMapsUrl || undefined}
+										target="_blank"
+										rel="noopener noreferrer"
+										className="flex items-center gap-1 font-bold text-theme-accent hover:opacity-80"
+									>
+										Open <FiExternalLink />
+									</a>
+								</div>
+							</>
+						) : (
+							<div className="flex h-28 flex-col items-center justify-center gap-2 p-4 text-center text-theme-text/40">
+								<FiMapPin className="text-xl" />
+								<span className="text-xs font-semibold">Enter coordinates to preview the map</span>
+							</div>
+						)}
+					</div>
 				</div>
 				<div className="grid grid-cols-2 gap-4">
 					<div className="flex flex-col gap-2">
@@ -276,7 +312,7 @@ export default function MachineDetailPage() {
 					</h3>
 					<button
 						onClick={() => setShowAddProduct(true)}
-						className="flex items-center gap-1.5 px-3 py-1.5 bg-theme-accent/20 text-theme-accent rounded-full text-xs font-medium hover:bg-theme-accent hover:text-white transition-all"
+						className="flex items-center gap-1.5 px-3 py-1.5 bg-theme-accent/20 text-white rounded-full text-xs font-medium hover:bg-theme-accent hover:text-white transition-all"
 					>
 						<FiPlus /> Add Product
 					</button>
@@ -343,7 +379,7 @@ export default function MachineDetailPage() {
 					onClick={handleRefill}
 					className="w-full py-3 bg-[#3b82f6] text-white rounded-xl font-bold hover:opacity-90 transition-all flex items-center justify-center gap-2"
 				>
-					<FiDroplet /> Record Full Refill
+					<FiDroplet /> Refill
 				</button>
 			</div>
 

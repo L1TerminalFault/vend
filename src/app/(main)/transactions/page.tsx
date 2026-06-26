@@ -86,14 +86,13 @@ export default function TransactionsPage() {
     { key: "refills", label: "Refills", count: refills.filter(r => selectedMachine === 'all' || r.machineId === selectedMachine).length, icon: FiDroplet },
   ];
 
-  // Calculate total dispensed volume for a transaction
-  const getTransactionVolume = (tx: TransactionType) => {
+  const getTransactionTotal = (tx: TransactionType) => {
     try {
       const data = JSON.parse(tx.transactionData);
       if (Array.isArray(data)) {
         return data.reduce((sum: number, item: { productId: string; quantity?: number }) => {
           const prod = products.find(p => p._id === item.productId);
-          return sum + (prod ? prod.unitWaterReq * (item.quantity || 1) : 0);
+          return sum + (prod ? prod.price * (item.quantity || 1) : 0);
         }, 0);
       }
     } catch {}
@@ -123,10 +122,10 @@ export default function TransactionsPage() {
 
   return (
     <div className="w-full h-full flex flex-col gap-6 p-6 px-4 md:px-8 overflow-y-auto mb-[100px] scrollbar-hidden">
-      <div ref={headerRef} className="flex flex-col sm:flex-row gap-4 mb-2 justify-between sm:items-end">
-        <div className="flex flex-col gap-2">
+      <div ref={headerRef} className="flex flex-col sm:flex-row w-full gap-4 mb-2 justify-between sm:items-end">
+        <div className="flex flex-col gap-2 w-full">
           <h2 className="text-3xl font-extrabold tracking-tight flex items-center gap-3">
-            <FiFileText className="text-theme-accent" /> Activity Log
+            <FiFileText className="text-theme-text" /> Activity Log
           </h2>
           <p className="text-theme-text/50">
             {loading ? "Loading..." : `${mixedData.length} records total`}
@@ -137,43 +136,46 @@ export default function TransactionsPage() {
             )}
           </p>
         </div>
-        <div className="relative">
-          <button
-            onClick={() => setShowMachineFilter(v => !v)}
-            className="flex items-center gap-2 px-4 py-2 bg-theme-card border border-theme-border rounded-full font-medium hover:bg-theme-background transition-all"
-          >
-            {selectedMachine === "all" ? "All Machines" : machines.find(m => m._id === selectedMachine)?.locationName || "Select"}
-            <FiChevronDown className={`transition-transform ${showMachineFilter ? "rotate-180" : ""}`} />
-          </button>
-          <AnimatePresence>
-            {showMachineFilter && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setShowMachineFilter(false)} />
-                <motion.div
-                  initial={{ opacity: 0, y: -8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  className="absolute right-0 top-full mt-2 z-50 min-w-[220px] bg-theme-card border border-theme-border/50 rounded-2xl shadow-xl overflow-hidden backdrop-blur-xl"
-                >
-                  <button
-                    onClick={() => { setSelectedMachine("all"); setShowMachineFilter(false); }}
-                    className={`w-full text-left px-4 py-3 hover:bg-theme-accent/10 transition-colors ${selectedMachine === "all" ? "bg-theme-accent/20 text-theme-accent font-bold" : "text-theme-text"}`}
-                  >All Machines</button>
-                  {machines.map(m => (
+
+        <div className="flex items-center gap-3 w-full justify-end">
+          <div className="relative">
+            <button
+              onClick={() => setShowMachineFilter(v => !v)}
+              className="flex items-center gap-2 px-4 py-2 bg-theme-card border border-theme-border rounded-full font-medium hover:bg-theme-background transition-all"
+            >
+              {selectedMachine === "all" ? "All Machines" : machines.find(m => m._id === selectedMachine)?.locationName || "Select"}
+              <FiChevronDown className={`transition-transform ${showMachineFilter ? "rotate-180" : ""}`} />
+            </button>
+            <AnimatePresence>
+              {showMachineFilter && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowMachineFilter(false)} />
+                  <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    className="absolute right-0 top-full mt-2 z-50 min-w-[220px] bg-theme-card border border-theme-border/50 rounded-2xl shadow-xl overflow-hidden backdrop-blur-xl"
+                  >
                     <button
-                      key={m._id}
-                      onClick={() => { setSelectedMachine(m._id); setShowMachineFilter(false); }}
-                      className={`w-full text-left px-4 py-3 hover:bg-theme-accent/10 transition-colors ${m._id === selectedMachine ? "bg-theme-accent/20 text-theme-accent font-bold" : "text-theme-text"}`}
-                    >
-                      {m.locationName}
-                      <span className="text-xs text-theme-text/40 ml-2">{m.locationDetail}</span>
-                    </button>
-                  ))}
-                </motion.div>
-              </>
-            )}
-          </AnimatePresence>
-        </div>
+                      onClick={() => { setSelectedMachine("all"); setShowMachineFilter(false); }}
+                      className={`w-full text-left px-4 py-3 hover:bg-theme-accent/10 transition-colors ${selectedMachine === "all" ? "bg-theme-accent/20 text-theme-accent font-bold" : "text-theme-text"}`}
+                    >All Machines</button>
+                    {machines.map(m => (
+                      <button
+                        key={m._id}
+                        onClick={() => { setSelectedMachine(m._id); setShowMachineFilter(false); }}
+                        className={`w-full text-left px-4 py-3 hover:bg-theme-accent/10 transition-colors ${m._id === selectedMachine ? "bg-theme-accent/20 text-theme-accent font-bold" : "text-theme-text"}`}
+                      >
+                        {m.locationName}
+                        <span className="text-xs text-theme-text/40 ml-2">{m.locationDetail}</span>
+                      </button>
+                    ))}
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
+          </div>
+	</div>
       </div>
 
       <div className="flex flex-wrap gap-2 p-1 bg-theme-card border border-theme-border/50 rounded-full w-fit">
@@ -231,7 +233,7 @@ export default function TransactionsPage() {
 
                 <div className="flex flex-col flex-1 min-w-0">
                   <span className="font-bold text-base truncate flex items-center gap-2">
-                    {isRefill ? 'Full Refill' : getOrderLabel(item as TransactionType)}
+                    {isRefill ? 'Refill' : getOrderLabel(item as TransactionType)}
                     {isRefill && (
                       <span className="text-[10px] uppercase tracking-wider font-black text-[#3b82f6] bg-[#3b82f6]/20 px-2 py-0.5 rounded-full">
                         Restock
@@ -255,7 +257,7 @@ export default function TransactionsPage() {
                       isRefill ? "text-[#3b82f6]" : "text-emerald-400"
                     }`}
                   >
-                    {isRefill ? 'Full capacity restore' : `-${getTransactionVolume(item as TransactionType)}ml water`}
+                    {isRefill ? '' : `$${getTransactionTotal(item as TransactionType).toFixed(2)} paid`}
                   </span>
                   <span className="text-[10px] text-theme-text/40 uppercase">
                     {new Date(item.createdAt!).toLocaleString()}

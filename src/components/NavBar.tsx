@@ -33,12 +33,17 @@ const routesUser: Route[] = [
 	{ name: "Settings", href: "/settings", icon: (p) => <FiSettings {...p} /> },
 ];
 
+const routesUnknown: Route[] = [
+	{ name: "Order", href: "/order", icon: (p) => <FiShoppingBag {...p} /> },
+	{ name: "Settings", href: "/settings", icon: (p) => <FiSettings {...p} /> },
+];
+
 export default function NavBar() {
 	const pathname = usePathname();
 	const router = useRouter();
 	const effectiveUser = useStoreStore((s) => s.effectiveUser);
 	const admin = isAdmin(effectiveUser?.userId);
-	const routes = admin ? routesAdmin : routesUser;
+	const routes = admin ? routesAdmin : effectiveUser && effectiveUser.userId !== "anon" ? routesUser : routesUnknown;
 
 	const isActive = (href: string) => pathname.startsWith(href);
 

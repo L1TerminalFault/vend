@@ -1,16 +1,16 @@
 "use client";
 
-import { useEffect, useState, useRef, useMemo } from "react";
+import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { useStoreStore, getRemainingWater, getMachineInventory, machineNeedsRefill, getProductUnitsLeft } from "@/lib/store";
 import { motion, AnimatePresence } from "framer-motion";
 import gsap from "gsap";
 import { 
 	AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
-	BarChart, Bar,
+	BarChart, Bar, LineChart, Line,
 } from "recharts";
 import { 
 	FiActivity, FiBox, FiDroplet, FiRefreshCw, FiChevronDown, FiTrendingUp,
-	FiBell, FiX, FiAlertTriangle, FiPackage, FiClock, FiHome,
+	FiBell, FiX, FiAlertTriangle, FiPackage, FiClock, FiHome, FiDollarSign,
 } from "react-icons/fi";
 import { CgSpinner } from "react-icons/cg";
 import ProductIcon, { getProductIconBg } from "@/components/ProductIcon";
@@ -22,7 +22,7 @@ export default function HomePage() {
   const [selectedMachine, setSelectedMachine] = useState<string>("all");
   const [showMachinePicker, setShowMachinePicker] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [chartGranularity, setChartGranularity] = useState<"daily" | "hourly">("daily");
+  const [chartGranularity, setChartGranularity] = useState<"daily" | "hourly">("hourly");
   const statsRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
 
@@ -64,6 +64,26 @@ export default function HomePage() {
     (t) => selectedMachine === "all" || t.machineId === selectedMachine,
   );
 
+  const getTransactionTotal = useCallback((transactionData: string) => {
+    try {
+      const data = JSON.parse(transactionData);
+      if (Array.isArray(data)) {
+        return data.reduce((sum: number, entry: { productId: string; quantity?: number }) => {
+          const prod = products.find((p) => p._id === entry.productId);
+          return sum + (prod ? prod.price * (entry.quantity || 1) : 0);
+        }, 0);
+      }
+    } catch {
+      /* ignore */
+    }
+    return 0;
+  }, [products]);
+
+  const totalPayments = scopedOrders.reduce(
+    (sum, tx) => sum + getTransactionTotal(tx.transactionData),
+    0,
+  );
+
   // Last refill info
   let lastRefillDate = "No refills recorded";
   let lastRefillAgo = "";
@@ -92,7 +112,7 @@ export default function HomePage() {
   const filteredMix = mixed.filter(x => selectedMachine === 'all' || x.machineId === selectedMachine);
 
   const chartData = useMemo(() => {
-    const chartMap: Record<string, { date: string; sortKey: number; orders: number; refills: number; volume: number }> = {};
+    const chartMap: Record<string, { date: string; sortKey: number; orders: number; refills: number; volume: number; payments: number }> = {};
     filteredMix.forEach((item) => {
       const d = new Date(item.createdAt!);
       const bucket = new Date(d);
@@ -107,9 +127,12 @@ export default function HomePage() {
           ? bucket.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric" })
           : bucket.toLocaleDateString(undefined, { month: "short", day: "numeric" });
       const key = String(sortKey);
-      if (!chartMap[key]) chartMap[key] = { date, sortKey, orders: 0, refills: 0, volume: 0 };
+      if (!chartMap[key]) chartMap[key] = { date, sortKey, orders: 0, refills: 0, volume: 0, payments: 0 };
       if (item.type === "t") {
         chartMap[key].orders += 1;
+        if ("transactionData" in item && typeof item.transactionData === "string") {
+          chartMap[key].payments += getTransactionTotal(item.transactionData);
+        }
         try {
 	  if ("transactionData" in item) {
             const data = JSON.parse((item as { transactionData: string }).transactionData);
@@ -127,7 +150,7 @@ export default function HomePage() {
       if (item.type === "r") chartMap[key].refills += 1;
     });
     return Object.values(chartMap).sort((a, b) => a.sortKey - b.sortKey);
-  }, [filteredMix, chartGranularity, products]);
+  }, [filteredMix, chartGranularity, products, getTransactionTotal]);
 
   // Volume per machine bar chart
   const machineBarData = scopedMachines.map((m) => ({
@@ -151,18 +174,18 @@ export default function HomePage() {
   const renderAdminDash = () => (
     <>
       {/* Top Header */}
-      <div ref={headerRef} className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-theme-border/50 pb-6 pt-2">
-        <div className="flex flex-col gap-2">
+      <div ref={headerRef} className="flex flex-col sm:flex-row w-full justify-between items-start sm:items-center gap-4 border-b border-theme-border/50 pb-6 pt-2">
+        <div className="flex flex-col gap-2 w-full">
           <h2 className="text-3xl font-extrabold tracking-tight flex items-center gap-3">
-            <FiHome className="text-theme-accent" /> Dashboard
+            <FiHome className="text-theme-text" /> Dashboard
           </h2>
           <p className="text-theme-text/50">
             {scopedMachines.length} machines · {scopedProducts.length} products — overview for{" "}
-            <span className="font-bold text-theme-accent">{selectedMachine === 'all' ? 'All Machines' : machines.find(m => m._id === selectedMachine)?.locationName}</span>
+            <span className="font-bold text-theme-text">{selectedMachine === 'all' ? 'All Machines' : machines.find(m => m._id === selectedMachine)?.locationName}</span>
           </p>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 w-full justify-end">
           <div className="relative">
             <button
               onClick={() => setShowMachinePicker((v) => !v)}
@@ -241,6 +264,13 @@ export default function HomePage() {
                 {scopedOrders.length}
               </span>
             </div>
+            <div className="hidden sm:block w-px bg-theme-border/50" />
+            <div className="flex flex-col gap-1">
+              <span className="text-theme-text/50 text-xs uppercase tracking-wider font-semibold">Payments Received</span>
+              <span className="text-4xl lg:text-5xl font-extrabold text-amber-400 tracking-tighter">
+                ${totalPayments.toFixed(2)}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -299,7 +329,7 @@ export default function HomePage() {
       </motion.div>
 
       {/* Header Stat Cards */}
-      <div ref={statsRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 w-full">
+      <div ref={statsRef} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6 w-full">
         <div className="flex flex-col bg-theme-card p-6 rounded-3xl shadow-lg border border-theme-border/30">
           <div className="flex justify-between items-start mb-2">
             <div className="flex flex-col gap-1">
@@ -357,6 +387,21 @@ export default function HomePage() {
           </div>
           <h2 className="text-3xl lg:text-4xl font-extrabold text-theme-text tracking-tighter mt-2">
             {scopedOrders.length}
+          </h2>
+        </div>
+
+        <div className="flex flex-col bg-theme-card p-6 rounded-3xl shadow-lg border border-theme-border/30">
+          <div className="flex justify-between items-start mb-2">
+            <div className="flex flex-col gap-1">
+              <span className="font-bold tracking-widest text-xs uppercase text-amber-400">Payments Received</span>
+              <span className="text-theme-text/40 text-[10px] uppercase">{selectedMachine === 'all' ? 'All machines' : 'This machine'}</span>
+            </div>
+            <div className="p-3 bg-amber-500/10 text-amber-400 rounded-xl">
+              <FiDollarSign className="text-xl" />
+            </div>
+          </div>
+          <h2 className="text-3xl lg:text-4xl font-extrabold text-theme-text tracking-tighter mt-2">
+            ${totalPayments.toFixed(2)}
           </h2>
         </div>
       </div>
@@ -437,10 +482,10 @@ export default function HomePage() {
         initial={{ opacity: 0, scale: 0.98 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 0.4 }}
-        className="w-full flex flex-col xl:flex-row gap-6 mt-4"
+        className="w-full grid grid-cols-1 xl:grid-cols-2 gap-6 mt-4"
       >
         {/* Activity Timeline */}
-        <div className="flex-1 min-w-0 h-[350px] bg-theme-card p-6 rounded-3xl shadow-xl flex flex-col border border-theme-border/30">
+        <div className="min-w-0 w-full h-[360px] sm:h-[350px] bg-theme-card p-4 sm:p-6 rounded-3xl shadow-xl flex flex-col border border-theme-border/30">
           <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
             <div className="flex items-center gap-3">
               <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
@@ -471,9 +516,9 @@ export default function HomePage() {
               </button>
             </div>
           </div>
-          <div className="flex-1 w-full min-h-0">
+          <div className="flex-1 w-full min-h-[240px]">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+              <AreaChart data={chartData} margin={{ top: 10, right: 12, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorOrders" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#10b981" stopOpacity={0.6}/>
@@ -496,20 +541,46 @@ export default function HomePage() {
         </div>
 
         {/* Volume per Machine Bar Chart */}
-        <div className="flex-1 min-w-0 h-[350px] bg-theme-card p-6 rounded-3xl shadow-xl flex flex-col border border-theme-border/30">
+        <div className="min-w-0 w-full h-[360px] sm:h-[350px] bg-theme-card p-4 sm:p-6 rounded-3xl shadow-xl flex flex-col border border-theme-border/30">
           <div className="flex items-center gap-3 mb-6">
             <div className="w-3 h-3 rounded-full bg-sky-500"></div>
             <h3 className="text-lg font-bold tracking-wide">Water by Machine</h3>
           </div>
-          <div className="flex-1 w-full min-h-0">
+          <div className="flex-1 w-full min-h-[240px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={machineBarData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+              <BarChart data={machineBarData} margin={{ top: 10, right: 12, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--borderCol)" vertical={false} />
                 <XAxis dataKey="name" stroke="var(--fg)" opacity={0.5} tickLine={false} axisLine={false} />
                 <YAxis stroke="var(--fg)" opacity={0.5} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}ml`} />
                 <Tooltip contentStyle={{ backgroundColor: 'var(--cardBg)', borderRadius: '12px', border: '1px solid var(--borderCol)', backdropFilter: 'blur(10px)' }} itemStyle={{ color: 'var(--fg)' }} />
                 <Bar dataKey="remaining" fill="#0ea5e9" radius={[8, 8, 0, 0]} name="Water remaining ml" />
               </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Payment Log */}
+        <div className="min-w-0 w-full h-[360px] sm:h-[350px] bg-theme-card p-4 sm:p-6 rounded-3xl shadow-xl flex flex-col border border-theme-border/30 xl:col-span-2">
+          <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
+            <div className="flex items-center gap-3">
+              <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+              <h3 className="text-lg font-bold tracking-wide">Payment Log</h3>
+            </div>
+            <span className="text-sm font-black text-amber-400">${totalPayments.toFixed(2)} received</span>
+          </div>
+          <div className="flex-1 w-full min-h-[240px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData} margin={{ top: 10, right: 12, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--borderCol)" vertical={false} />
+                <XAxis dataKey="date" stroke="var(--fg)" opacity={0.5} tickLine={false} axisLine={false} />
+                <YAxis stroke="var(--fg)" opacity={0.5} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v}`} />
+                <Tooltip
+                  formatter={(value) => [`$${Number(value).toFixed(2)}`, "Payments"]}
+                  contentStyle={{ backgroundColor: 'var(--cardBg)', borderRadius: '12px', border: '1px solid var(--borderCol)', backdropFilter: 'blur(10px)' }}
+                  itemStyle={{ color: 'var(--fg)' }}
+                />
+                <Line type="monotone" dataKey="payments" stroke="#f59e0b" strokeWidth={3} dot={{ r: 3 }} activeDot={{ r: 5 }} name="Payments" />
+              </LineChart>
             </ResponsiveContainer>
           </div>
         </div>
@@ -606,10 +677,10 @@ export default function HomePage() {
       <div className="flex flex-col gap-6 w-full">
          <div ref={headerRef} className="flex flex-col gap-2 border-b border-theme-border/50 pb-6 pt-2">
             <h2 className="text-3xl font-extrabold tracking-tight flex items-center gap-3">
-              <FiHome className="text-theme-accent" /> My Dashboard
+              <FiHome className="text-theme-text" /> My Dashboard
             </h2>
             <p className="text-theme-text/50">
-              {myTrans.length} orders placed · {machines.length} machines available
+              {myTrans.length} orders placed
             </p>
          </div>
 
@@ -629,7 +700,7 @@ export default function HomePage() {
              </h2>
            </div>
 
-           <div className="flex flex-col bg-theme-card p-6 rounded-3xl shadow-lg border border-theme-border/30">
+	   {/* <div className="flex flex-col bg-theme-card p-6 rounded-3xl shadow-lg border border-theme-border/30">
              <div className="flex justify-between items-start mb-2">
                <div className="flex flex-col gap-1">
                  <span className="font-bold tracking-widest text-xs uppercase text-sky-400">Available Machines</span>
@@ -642,7 +713,7 @@ export default function HomePage() {
              <h2 className="text-3xl lg:text-4xl font-extrabold text-theme-text tracking-tighter mt-2">
                {machines.length}
              </h2>
-           </div>
+           </div> */}
          </div>
 
          {/* Recent orders list */}

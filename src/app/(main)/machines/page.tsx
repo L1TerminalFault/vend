@@ -151,7 +151,7 @@ export default function MachinesPage() {
 		<div className="w-full h-full flex flex-col gap-6 p-6 px-4 md:px-8 overflow-y-auto mb-[100px] scrollbar-hidden">
 			<div ref={headerRef} className="flex flex-col gap-2 mb-2">
 				<h2 className="text-3xl font-extrabold tracking-tight flex items-center gap-3">
-					<FiCpu className="text-theme-accent" /> Machine Management
+					<FiCpu className="text-theme-text" /> Machine Management
 				</h2>
 				<p className="text-theme-text/50">
 					{machines.length} machines · {products.length} products in catalogue
@@ -181,7 +181,7 @@ export default function MachinesPage() {
 						<span className="text-theme-text/50 text-sm">{machines.length} registered machines</span>
 						<button
 							onClick={() => setShowAddMachine(true)}
-							className="flex items-center gap-2 px-4 py-2 bg-theme-accent/20 text-theme-accent rounded-full font-medium hover:bg-theme-accent hover:text-white transition-all"
+							className="flex items-center gap-2 px-4 py-2 bg-theme-accent text-white rounded-full font-medium hover:bg-theme-accent/70 hover:text-white transition-all"
 						>
 							<FiPlus /> Add Machine
 						</button>
@@ -207,7 +207,16 @@ export default function MachinesPage() {
 									initial={{ opacity: 0, y: 12 }}
 									animate={{ opacity: 1, y: 0 }}
 									transition={{ delay: idx * 0.04, duration: 0.3 }}
-									className="flex flex-col gap-3 p-4 bg-theme-card border border-theme-border/30 rounded-2xl hover:bg-theme-card/80 transition-all duration-300"
+									onClick={() => router.push(`/machines/${m._id}`)}
+									role="button"
+									tabIndex={0}
+									onKeyDown={(event) => {
+										if (event.key === "Enter" || event.key === " ") {
+											event.preventDefault();
+											router.push(`/machines/${m._id}`);
+										}
+									}}
+									className="flex flex-col gap-3 p-4 bg-theme-card border border-theme-border/30 rounded-2xl hover:bg-theme-card/80 hover:border-theme-accent/40 transition-all duration-300 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent/60"
 								>
 									<div className="flex items-center gap-4">
 										<div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-theme-accent/20 text-theme-accent">
@@ -236,14 +245,20 @@ export default function MachinesPage() {
 											)}
 										</div>
 										<div className="flex items-center gap-2 shrink-0">
-											<button
-												onClick={() => router.push(`/machines/${m._id}`)}
+										{/* <button
+												onClick={(event) => {
+													event.stopPropagation();
+													router.push(`/machines/${m._id}`);
+												}}
 												className="flex items-center gap-1.5 px-3 py-2 bg-theme-accent/10 text-theme-accent rounded-xl text-sm font-medium hover:bg-theme-accent/20 transition-all"
 											>
 												<FiEdit2 /> Manage
-											</button>
+											</button> */}
 											<button
-												onClick={() => handleDeleteMachine(m._id)}
+												onClick={(event) => {
+													event.stopPropagation();
+													handleDeleteMachine(m._id);
+												}}
 												className="p-2.5 text-red-400 hover:bg-red-400/20 rounded-xl transition-all"
 											>
 												<FiTrash2 />
@@ -283,7 +298,7 @@ export default function MachinesPage() {
 						<span className="text-theme-text/50 text-sm">{products.length} products in catalogue</span>
 						<button
 							onClick={() => setShowAddProduct(true)}
-							className="flex items-center gap-2 px-4 py-2 bg-theme-accent/20 text-theme-accent rounded-full font-medium hover:bg-theme-accent hover:text-white transition-all"
+							className="flex items-center gap-2 px-4 py-2 bg-theme-accent text-white rounded-full font-medium hover:bg-theme-accent/70 hover:text-white transition-all"
 						>
 							<FiPlus /> Add Product
 						</button>

@@ -19,8 +19,8 @@ export const defaultThemes: Theme[] = [
     bg: "#0a0a0a",
     fg: "#ededed",
     cardBg: "rgba(255, 255, 255, 0.05)",
-    accent: "rgba(255, 255, 255, 0.1)",
-    borderCol: "rgba(255, 255, 255, 0.1)",
+    accent: "rgba(255, 255, 255, 0.42)",
+    borderCol: "rgba(255, 255, 255, 0.16)",
   },
   {
     id: "light",

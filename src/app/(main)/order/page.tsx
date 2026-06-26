@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { useStoreStore, getMachineInventory, getRemainingWater, getProductUnitsLeft, getProductPowderUnitsLeft, getRemainingPowderForProduct } from "@/lib/store";
 import { motion, AnimatePresence } from "framer-motion";
 import gsap from "gsap";
@@ -9,8 +10,16 @@ import { CgSpinner } from "react-icons/cg";
 
 import EmptyState from "@/components/EmptyState";
 import ProductIcon from "@/components/ProductIcon";
+import { isAdmin } from "@/lib/utils";
+
+type DetectedBarcode = { rawValue: string };
+
+type BarcodeDetectorCtor = new (options?: { formats?: string[] }) => {
+  detect: (source: CanvasImageSource) => Promise<DetectedBarcode[]>;
+};
 
 export default function OrderPage() {
+  const router = useRouter();
   const [urlMachineId, setUrlMachineId] = useState("");
   const [loading, setLoading] = useState(true);
   
@@ -24,13 +33,19 @@ export default function OrderPage() {
   const [processing, setProcessing] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
+  const [scanActive, setScanActive] = useState(false);
+  const [scanError, setScanError] = useState("");
   const cartRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const scanFrameRef = useRef<number | null>(null);
   
   // Cart: { productId: string, quantity: number }
   const [cart, setCart] = useState<{ productId: string, quantity: number }[]>([]);
 
   const { machines, products, transactions, refills, effectiveUser } = useStoreStore();
+  const admin = isAdmin(effectiveUser?.userId);
 
   useEffect(() => {
     if (machines.length > 0 || products.length > 0 || effectiveUser) {
@@ -62,6 +77,94 @@ export default function OrderPage() {
       );
     }
   }, [cart.length]);
+
+  const stopQrScan = () => {
+    if (scanFrameRef.current) {
+      cancelAnimationFrame(scanFrameRef.current);
+      scanFrameRef.current = null;
+    }
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    setScanActive(false);
+  };
+
+  useEffect(() => {
+    return () => stopQrScan();
+  }, []);
+
+  const getMachineIdFromScan = (rawValue: string) => {
+    const trimmed = rawValue.trim();
+    try {
+      const url = new URL(trimmed, window.location.origin);
+      return url.searchParams.get("machineId") || trimmed;
+    } catch {
+      return trimmed;
+    }
+  };
+
+  const handleScannedMachine = (rawValue: string) => {
+    const scannedMachineId = getMachineIdFromScan(rawValue);
+    if (!scannedMachineId) {
+      setScanError("QR code did not include a machine ID.");
+      return;
+    }
+    stopQrScan();
+    setScanError("");
+    setMachineIdInput(scannedMachineId);
+    setConfirmedMachine(scannedMachineId);
+    router.replace(`/order?machineId=${encodeURIComponent(scannedMachineId)}`);
+  };
+
+  const startQrScan = async () => {
+    setScanError("");
+    const BarcodeDetector = (window as typeof window & { BarcodeDetector?: BarcodeDetectorCtor }).BarcodeDetector;
+    if (!BarcodeDetector) {
+      setScanError("QR scanning is not supported in this browser. Use a browser with camera QR support.");
+      return;
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setScanError("Camera access is not available in this browser.");
+      return;
+    }
+
+    try {
+      setScanActive(true);
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" } },
+        audio: false,
+      });
+      streamRef.current = stream;
+
+      const video = videoRef.current;
+      if (!video) {
+        stopQrScan();
+        return;
+      }
+      video.srcObject = stream;
+      await video.play();
+
+      const detector = new BarcodeDetector({ formats: ["qr_code"] });
+      const scan = async () => {
+        if (!videoRef.current || !streamRef.current) return;
+        try {
+          const codes = await detector.detect(videoRef.current);
+          const code = codes[0]?.rawValue;
+          if (code) {
+            handleScannedMachine(code);
+            return;
+          }
+        } catch {
+          setScanError("Could not read the QR code. Keep it centered and try again.");
+        }
+        scanFrameRef.current = requestAnimationFrame(scan);
+      };
+      scanFrameRef.current = requestAnimationFrame(scan);
+    } catch {
+      setScanError("Camera access was blocked or unavailable.");
+      stopQrScan();
+    }
+  };
 
   const machine = machines.find(m => m._id === confirmedMachine);
   const inventory = machine
@@ -209,14 +312,58 @@ export default function OrderPage() {
     );
   }
 
+  if (!admin && !urlMachineId && !confirmedMachine) {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center p-6 text-theme-text">
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          className="flex flex-col p-10 rounded-3xl bg-theme-card border border-theme-border/30 shadow-2xl items-center text-center w-full max-w-xl relative overflow-hidden"
+        >
+          <div className="absolute inset-0 bg-gradient-to-b from-theme-accent/5 to-transparent pointer-events-none" />
+          <div className="p-5 bg-theme-accent/10 rounded-full mb-6 text-theme-accent ring-8 ring-theme-accent/5 relative z-10">
+            <FiSmartphone className="w-12 h-12" />
+          </div>
+          <h2 className="text-2xl font-extrabold tracking-tight mb-2 text-theme-text relative z-10">
+            Scan a machine QR code
+          </h2>
+          <p className="text-sm opacity-60 relative z-10 max-w-sm">
+            Orders start from the QR code on the vending machine. Scan it to open the correct order page.
+          </p>
+          <div className="relative z-10 w-full mt-8 flex flex-col gap-4">
+            {scanActive && (
+              <div className="w-full overflow-hidden rounded-2xl border border-theme-border/40 bg-black aspect-[4/3]">
+                <video ref={videoRef} className="h-full w-full object-cover" muted playsInline />
+              </div>
+            )}
+            {scanError && (
+              <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-3 text-sm font-semibold text-red-400">
+                {scanError}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={scanActive ? stopQrScan : startQrScan}
+              className="w-full py-4 text-sm rounded-full bg-theme-accent text-white font-bold tracking-widest uppercase shadow-[0_8px_30px_var(--accent)] hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+            >
+              {scanActive ? "Stop Scan" : "Scan QR"} <FiSmartphone className="text-lg" />
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col w-full h-full p-6 pb-24 md:px-8 max-w-7xl mx-auto gap-6 overflow-y-auto scrollbar-hidden mb-[100px]">
       <div ref={headerRef} className="flex flex-col gap-2 mb-2">
         <h2 className="text-3xl font-extrabold tracking-tight flex items-center gap-3">
-          <FiShoppingBag className="text-theme-accent" /> Place Order
+          <FiShoppingBag className="text-theme-text" /> Place Order
         </h2>
         <p className="text-theme-text/50">
-          {confirmedMachine
+          {!admin && confirmedMachine
+            ? "Choose products and checkout"
+            : confirmedMachine
             ? `Ordering from ${machine?.locationName || "machine"} · ${machineProducts.length} products available`
             : `${machines.length} machines online · Connect to start ordering`}
         </p>
@@ -230,8 +377,13 @@ export default function OrderPage() {
               <FiSmartphone className="w-12 h-12" />
           </div>
           <h2 className="text-2xl font-extrabold tracking-tight mb-2 text-theme-text relative z-10">Connect to Machine</h2>
-          <p className="text-sm opacity-60 mb-8 relative z-10 max-w-sm">Scan the QR code on the vending machine, or manually enter the Machine ID to start your order.</p>
+          <p className="text-sm opacity-60 mb-8 relative z-10 max-w-sm">
+            {admin
+              ? "Scan the QR code on the vending machine, or manually enter the Machine ID to start your order."
+              : "Scan the QR code on the vending machine to start your order."}
+          </p>
           
+          {admin && (
           <div className="w-full relative z-10 mb-4">
               <input 
                 type="text" 
@@ -241,9 +393,10 @@ export default function OrderPage() {
                 placeholder="MACHINE-ID"
               />
           </div>
+          )}
 
           {/* Quick pick from known machines */}
-          {machines.length > 0 && (
+          {admin && machines.length > 0 && (
             <div className="w-full relative z-10 mb-6">
               <p className="text-xs uppercase tracking-widest text-theme-text/40 font-bold mb-3">Or select a machine</p>
               <div className="flex flex-wrap gap-2 justify-center">
@@ -263,11 +416,11 @@ export default function OrderPage() {
           )}
 
           <button 
-            onClick={() => setConfirmedMachine(machineIdInput)}
-            disabled={!machineIdInput}
+            onClick={admin ? () => setConfirmedMachine(machineIdInput) : startQrScan}
+            disabled={admin && !machineIdInput}
             className="w-full py-4 text-sm rounded-full bg-theme-accent text-white font-bold tracking-widest uppercase shadow-[0_8px_30px_var(--accent)] hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:shadow-none disabled:active:scale-100 flex items-center justify-center gap-2 relative z-10"
           >
-            Connect <FiArrowRight className="text-lg" />
+            {admin ? "Connect" : "Scan QR"} <FiArrowRight className="text-lg" />
           </button>
         </motion.div>
       ) : (
@@ -276,15 +429,20 @@ export default function OrderPage() {
           <div className="flex flex-col gap-1 border-b border-theme-border/50 pb-6">
              <div className="flex justify-between items-start">
                  <h3 className="text-xl font-extrabold tracking-tight">Dispense Menu</h3>
+                 {admin && (
                  <button onClick={() => { setConfirmedMachine(""); setCart([]); setError(""); }} className="text-[10px] uppercase font-bold tracking-widest opacity-50 hover:text-theme-accent hover:opacity-100 px-3 py-1.5 bg-theme-card border border-theme-border rounded-full transition-colors">
                      Disconnect
                  </button>
+                 )}
              </div>
              <p className="text-theme-text/50 mt-1 flex items-center gap-2">
                  <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]" />
-                 {machine ? machine.locationName : 'Unknown Vendor'} · <span className="font-mono text-xs opacity-70 uppercase tracking-widest">{confirmedMachine.slice(0, 12)}</span>
+                 {admin
+                   ? <>{machine ? machine.locationName : 'Unknown Vendor'} · <span className="font-mono text-xs opacity-70 uppercase tracking-widest">{confirmedMachine.slice(0, 12)}</span></>
+                   : "Ready to order"}
              </p>
              {/* Machine status bar */}
+             {admin && (
              <div className="flex items-center gap-3 mt-3">
                <div className="flex-1 h-2 bg-theme-border/30 rounded-full overflow-hidden">
                  <motion.div 
@@ -296,6 +454,7 @@ export default function OrderPage() {
                </div>
                <span className={`text-xs font-bold ${fillPct < 20 ? 'text-red-400' : 'text-theme-text/50'}`}>{fillPct.toFixed(0)}% Water</span>
              </div>
+             )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -319,7 +478,10 @@ export default function OrderPage() {
             
             {machineProducts.length === 0 ? (
               <div className="col-span-full">
-                <EmptyState title="No products assigned" message="This machine has no products configured yet." />
+                <EmptyState
+                  title={machine ? "No products available" : "Order unavailable"}
+                  message={machine ? "No products are available for ordering right now." : "This QR code does not match an available ordering point."}
+                />
               </div>
             ) : machineProducts.map((p, i) => {
                const powderUnitsLeft = getPowderUnitsLeft(p._id);
@@ -343,11 +505,15 @@ export default function OrderPage() {
                             <div className="flex flex-col gap-1">
                             <span className="font-extrabold tracking-tight text-xl text-theme-text">{p.name}</span>
                             <div className="flex items-center gap-2 flex-wrap">
+                                {admin && (
                                 <span className="text-xs bg-theme-background border border-theme-border/50 px-2 py-0.5 rounded-md font-mono tracking-widest opacity-80">{p.unitWaterReq}ML water</span>
+                                )}
                                 <span className="text-xs font-semibold opacity-60 uppercase">{p.category}</span>
+                                {admin && (
                                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${powderUnitsLeft <= 0 ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-500'}`}>
                                   {powderUnitsLeft <= 0 ? 'No powder' : `${powderUnitsLeft} servings`}
                                 </span>
+                                )}
                             </div>
                             </div>
                         </div>
@@ -364,7 +530,7 @@ export default function OrderPage() {
                          <button 
                            disabled={!canAdd || processing}
                            onClick={() => addToCart(p._id)}
-                           className={`w-full py-3 rounded-full font-bold text-xs tracking-widest uppercase flex items-center justify-center gap-2 transition-all ${canAdd ? 'bg-theme-accent/10 border border-theme-accent/30 text-theme-accent hover:bg-theme-accent hover:text-white' : 'hidden'}`}
+                           className={`w-full py-3 rounded-full font-bold text-xs tracking-widest uppercase flex items-center justify-center gap-2 transition-all ${canAdd ? 'bg-theme-accent border border-theme-accent text-white hover:bg-theme-accent/70 hover:text-white' : 'hidden'}`}
                          >
                            Add to Order <FiPlus />
                          </button>
@@ -413,7 +579,9 @@ export default function OrderPage() {
                                 <motion.div key={item.productId} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="flex overflow-hidden justify-between items-center bg-theme-background/50 border border-theme-border/30 rounded-xl p-4">
                                     <div className="flex flex-col">
                                         <span className="font-bold text-sm">{p.name}</span>
-                                        <span className="text-xs opacity-60">{p.unitWaterReq}ml water · {item.quantity}× = {p.unitWaterReq * item.quantity}ml</span>
+                                        <span className="text-xs opacity-60">
+                                          {admin ? `${p.unitWaterReq}ml water · ${item.quantity}× = ${p.unitWaterReq * item.quantity}ml` : `${item.quantity}× selected`}
+                                        </span>
                                     </div>
                                     <div className="flex flex-col items-end">
                                       <span className="font-mono text-sm font-bold">${(p.price * item.quantity).toFixed(2)}</span>
@@ -427,21 +595,27 @@ export default function OrderPage() {
             </div>
 
             <div className="flex flex-col gap-3 mt-6 pt-6 border-t border-theme-border/50">
+                {admin && (
                 <div className="flex justify-between items-center text-sm opacity-80">
                     <span>Water Available</span>
                     <span className="font-mono bg-theme-background border border-theme-border px-3 py-1 rounded-lg text-xs">{waterAfterCart.toLocaleString()}ML</span>
                 </div>
+                )}
+                {admin && (
                 <div className="flex justify-between items-center text-sm opacity-80">
                     <span>Order Water</span>
                     <span className={`font-mono text-xs ${currentCartWater > remainingWater ? 'text-red-400 font-bold' : ''}`}>{currentCartWater.toLocaleString()}ML</span>
                 </div>
+                )}
                 {/* Water bar */}
+                {admin && (
                 <div className="h-1.5 w-full bg-theme-border/30 rounded-full overflow-hidden">
                   <motion.div 
                     animate={{ width: `${machineCapacity > 0 ? ((currentCartWater / machineCapacity) * 100) : 0}%` }}
                     className="h-full rounded-full bg-sky-500"
                   />
                 </div>
+                )}
                 <div className="flex justify-between items-end mt-4">
                     <span className="font-bold text-lg">Total</span>
                     <span className="font-black text-3xl tracking-tighter">${getCartTotal().toFixed(2)}</span>

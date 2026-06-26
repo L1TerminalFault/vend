@@ -55,7 +55,7 @@ export default function SettingsPage() {
     <div className="md:p-10 p-3 pt-6 gap-8 h-full w-full flex flex-col mb-[100px] overflow-y-auto scrollbar-hidden items-center">
       <div ref={headerRef} className="z-10 px-3 w-full flex flex-col gap-2 max-w-4xl">
         <h2 className="text-3xl font-extrabold tracking-tight flex items-center gap-3">
-          <FiSettings className="text-theme-accent" /> Theme Settings
+          <FiSettings className="text-theme-text" /> Theme Settings
         </h2>
         <p className="text-theme-text/50">Customize colors, presets, and background for your vending experience</p>
       </div>
