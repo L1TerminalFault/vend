@@ -8,7 +8,7 @@ const VERSION_STRING = "1.0";
 export default function TitleBar() {
 	return (
 		<div className="fixed top-0 left-0 right-0 z-90 flex justify-center pt-5 px-4 pointer-events-none">
-			<div className="pointer-events-auto flex items-center justify-between gap-4 rounded-full px-6 py-4.5 shadow-lg shadow-black/30 backdrop-blur-xl bg-theme-card/80 border border-theme-border/30 text-base md:text-lg min-w-[min(100%,320px)] max-w-7xl w-full">
+			<div className="pointer-events-auto flex items-center justify-between gap-4 rounded-full px-6 py-3.5 shadow-lg shadow-black/30 backdrop-blur-xl bg-theme-card/80 border border-theme-border/30 text-base md:text-lg min-w-[min(100%,320px)] max-w-7xl w-full">
 				<div className="truncate font-semibold flex items-center gap-2">
 					Vend{" "}
 					<span className="text-xs text-theme-text/50 font-normal mt-0.5">
