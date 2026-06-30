@@ -148,7 +148,7 @@ export default function TransactionsPage() {
             </button>
             <AnimatePresence>
               {showMachineFilter && (
-                <>
+		      <div>
                   <div className="fixed inset-0 z-40" onClick={() => setShowMachineFilter(false)} />
                   <motion.div
                     initial={{ opacity: 0, y: -8 }}
@@ -171,7 +171,7 @@ export default function TransactionsPage() {
                       </button>
                     ))}
                   </motion.div>
-                </>
+		  </div>
               )}
             </AnimatePresence>
           </div>

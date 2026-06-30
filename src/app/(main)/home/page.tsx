@@ -197,7 +197,7 @@ export default function HomePage() {
             </button>
             <AnimatePresence>
               {showMachinePicker && (
-                <>
+		      <div>
                   <div className="fixed inset-0 z-40" onClick={() => setShowMachinePicker(false)} />
                   <motion.div
                     initial={{ opacity: 0, y: -8 }}
@@ -219,7 +219,7 @@ export default function HomePage() {
                       </button>
                     ))}
                   </motion.div>
-                </>
+		  </div>
               )}
             </AnimatePresence>
           </div>
@@ -518,7 +518,7 @@ export default function HomePage() {
           </div>
           <div className="flex-1 w-full min-h-[240px]">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 10, right: 12, left: -20, bottom: 0 }}>
+              <AreaChart data={chartData} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorOrders" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#10b981" stopOpacity={0.6}/>
@@ -548,7 +548,7 @@ export default function HomePage() {
           </div>
           <div className="flex-1 w-full min-h-[240px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={machineBarData} margin={{ top: 10, right: 12, left: -20, bottom: 0 }}>
+              <BarChart data={machineBarData} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--borderCol)" vertical={false} />
                 <XAxis dataKey="name" stroke="var(--fg)" opacity={0.5} tickLine={false} axisLine={false} />
                 <YAxis stroke="var(--fg)" opacity={0.5} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}ml`} />
